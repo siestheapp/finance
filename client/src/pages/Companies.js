@@ -7,7 +7,7 @@ import {
   Calendar,
   Filter,
   ChevronRight,
-  Industry
+  Factory
 } from 'lucide-react';
 import { companiesApi, handleApiError } from '../services/api';
 import toast from 'react-hot-toast';
@@ -216,7 +216,7 @@ const Companies = () => {
                   <div className="space-y-1">
                                           {company.industry && (
                         <p className="text-sm text-gray-600 flex items-center">
-                          <Industry className="h-3 w-3 mr-1" />
+                          <Factory className="h-3 w-3 mr-1" />
                           {company.industry}
                         </p>
                       )}

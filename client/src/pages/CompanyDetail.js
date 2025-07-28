@@ -5,7 +5,7 @@ import {
   Building2, 
   Plus, 
   Calendar,
-  Industry,
+  Factory,
   BarChart3,
   TrendingUp
 } from 'lucide-react';
@@ -97,7 +97,7 @@ const CompanyDetail = () => {
               <div className="flex items-center space-x-4 text-sm text-gray-600 mt-2">
                                                  {company.industry && (
                   <span className="flex items-center">
-                    <Industry className="h-4 w-4 mr-1" />
+                    <Factory className="h-4 w-4 mr-1" />
                     {company.industry}
                   </span>
                 )}

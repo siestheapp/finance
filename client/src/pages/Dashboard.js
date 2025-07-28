@@ -7,7 +7,7 @@ import {
   BarChart3,
   Plus,
   Calendar,
-  Industry
+  Factory
 } from 'lucide-react';
 import { companiesApi, handleApiError, formatRatio, formatPercentage } from '../services/api';
 import toast from 'react-hot-toast';
@@ -61,7 +61,7 @@ const Dashboard = () => {
     {
       title: 'Industries',
       value: stats?.industries || 0,
-      icon: Industry,
+      icon: Factory,
       color: 'green',
     },
     {
