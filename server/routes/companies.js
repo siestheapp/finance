@@ -20,20 +20,24 @@ router.get('/', async (req, res) => {
     let sql = 'SELECT * FROM companies';
     let params = [];
     let conditions = [];
+    let paramIndex = 1;
 
     if (search) {
-      conditions.push('name LIKE ?');
+      conditions.push(`name ILIKE $${paramIndex}`);
       params.push(`%${search}%`);
+      paramIndex++;
     }
 
     if (industry) {
-      conditions.push('industry = ?');
+      conditions.push(`industry = $${paramIndex}`);
       params.push(industry);
+      paramIndex++;
     }
 
     if (sector) {
-      conditions.push('sector = ?');
+      conditions.push(`sector = $${paramIndex}`);
       params.push(sector);
+      paramIndex++;
     }
 
     if (conditions.length > 0) {
@@ -56,7 +60,7 @@ router.get('/:id', async (req, res) => {
     const companyId = req.params.id;
     
     // Get company details
-    const company = await db.get('SELECT * FROM companies WHERE id = ?', [companyId]);
+    const company = await db.get('SELECT * FROM companies WHERE id = $1', [companyId]);
     
     if (!company) {
       return res.status(404).json({ error: 'Company not found' });
@@ -66,7 +70,7 @@ router.get('/:id', async (req, res) => {
     const financialMetrics = await db.all(
       `SELECT fm.*, cr.* FROM financial_metrics fm
        LEFT JOIN calculated_ratios cr ON fm.id = cr.financial_metrics_id
-       WHERE fm.company_id = ?
+       WHERE fm.company_id = $1
        ORDER BY fm.period_end_date DESC`,
       [companyId]
     );
@@ -100,17 +104,17 @@ router.post('/', companyValidation, async (req, res) => {
 
     const result = await db.run(
       `INSERT INTO companies (name, industry, sector, description, analyst_notes, presentation_date)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
       [name, industry, sector, description, analyst_notes, presentation_date]
     );
 
     // Get the created company
-    const company = await db.get('SELECT * FROM companies WHERE id = ?', [result.id]);
+    const company = await db.get('SELECT * FROM companies WHERE id = $1', [result.rows[0].id]);
     
     res.status(201).json(company);
   } catch (error) {
     console.error('Error creating company:', error);
-    if (error.message.includes('UNIQUE constraint failed')) {
+    if (error.code === '23505') { // PostgreSQL unique constraint violation
       res.status(409).json({ error: 'Company with this name already exists' });
     } else {
       res.status(500).json({ error: 'Failed to create company' });
@@ -138,9 +142,9 @@ router.put('/:id', companyValidation, async (req, res) => {
 
     const result = await db.run(
       `UPDATE companies 
-       SET name = ?, industry = ?, sector = ?, description = ?, 
-           analyst_notes = ?, presentation_date = ?, updated_at = CURRENT_TIMESTAMP
-       WHERE id = ?`,
+       SET name = $1, industry = $2, sector = $3, description = $4, 
+           analyst_notes = $5, presentation_date = $6, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $7`,
       [name, industry, sector, description, analyst_notes, presentation_date, companyId]
     );
 
@@ -149,11 +153,11 @@ router.put('/:id', companyValidation, async (req, res) => {
     }
 
     // Get the updated company
-    const company = await db.get('SELECT * FROM companies WHERE id = ?', [companyId]);
+    const company = await db.get('SELECT * FROM companies WHERE id = $1', [companyId]);
     res.json(company);
   } catch (error) {
     console.error('Error updating company:', error);
-    if (error.message.includes('UNIQUE constraint failed')) {
+    if (error.code === '23505') { // PostgreSQL unique constraint violation
       res.status(409).json({ error: 'Company with this name already exists' });
     } else {
       res.status(500).json({ error: 'Failed to update company' });
@@ -166,7 +170,7 @@ router.delete('/:id', async (req, res) => {
   try {
     const companyId = req.params.id;
     
-    const result = await db.run('DELETE FROM companies WHERE id = ?', [companyId]);
+    const result = await db.run('DELETE FROM companies WHERE id = $1', [companyId]);
     
     if (result.changes === 0) {
       return res.status(404).json({ error: 'Company not found' });

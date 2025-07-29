@@ -1,69 +1,67 @@
-const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
+const { Pool } = require('pg');
 
-const dbPath = path.join(__dirname, '../data/clo_analytics.db');
+// PostgreSQL connection configuration
+const pool = new Pool({
+  user: process.env.DB_USER || process.env.USER || 'seandavey', // Use system user as default
+  host: process.env.DB_HOST || 'localhost',
+  database: process.env.DB_NAME || 'clo_analytics',
+  password: process.env.DB_PASSWORD || '', // No password for local development
+  port: process.env.DB_PORT || 5432,
+});
 
 class Database {
   constructor() {
-    this.db = new sqlite3.Database(dbPath, (err) => {
+    // Test the connection
+    pool.connect((err, client, release) => {
       if (err) {
-        console.error('Error opening database:', err.message);
+        console.error('Error connecting to PostgreSQL database:', err.message);
       } else {
-        console.log('Connected to SQLite database');
+        console.log('Connected to PostgreSQL database');
+        release();
       }
     });
   }
 
   // Helper method to run queries with promises
-  run(sql, params = []) {
-    return new Promise((resolve, reject) => {
-      this.db.run(sql, params, function(err) {
-        if (err) {
-          reject(err);
-        } else {
-          resolve({ id: this.lastID, changes: this.changes });
-        }
-      });
-    });
+  async run(sql, params = []) {
+    const client = await pool.connect();
+    try {
+      const result = await client.query(sql, params);
+      return { 
+        id: result.rows[0]?.id || null, 
+        changes: result.rowCount,
+        rows: result.rows 
+      };
+    } finally {
+      client.release();
+    }
   }
 
   // Helper method to get single row
-  get(sql, params = []) {
-    return new Promise((resolve, reject) => {
-      this.db.get(sql, params, (err, row) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(row);
-        }
-      });
-    });
+  async get(sql, params = []) {
+    const client = await pool.connect();
+    try {
+      const result = await client.query(sql, params);
+      return result.rows[0] || null;
+    } finally {
+      client.release();
+    }
   }
 
   // Helper method to get all rows
-  all(sql, params = []) {
-    return new Promise((resolve, reject) => {
-      this.db.all(sql, params, (err, rows) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(rows);
-        }
-      });
-    });
+  async all(sql, params = []) {
+    const client = await pool.connect();
+    try {
+      const result = await client.query(sql, params);
+      return result.rows;
+    } finally {
+      client.release();
+    }
   }
 
-  // Close database connection
-  close() {
-    return new Promise((resolve, reject) => {
-      this.db.close((err) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve();
-        }
-      });
-    });
+  // Close database connection pool
+  async close() {
+    await pool.end();
   }
 }
 

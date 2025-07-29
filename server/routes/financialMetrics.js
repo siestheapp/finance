@@ -28,7 +28,7 @@ router.get('/:companyId', async (req, res) => {
       `SELECT fm.*, cr.*
        FROM financial_metrics fm
        LEFT JOIN calculated_ratios cr ON fm.id = cr.financial_metrics_id
-       WHERE fm.company_id = ?
+       WHERE fm.company_id = $1
        ORDER BY fm.period_end_date DESC`,
       [companyId]
     );
@@ -65,7 +65,7 @@ router.post('/', financialMetricsValidation, async (req, res) => {
     } = req.body;
 
     // Validate that company exists
-    const company = await db.get('SELECT id FROM companies WHERE id = ?', [company_id]);
+    const company = await db.get('SELECT id FROM companies WHERE id = $1', [company_id]);
     if (!company) {
       return res.status(404).json({ error: 'Company not found' });
     }
@@ -75,10 +75,12 @@ router.post('/', financialMetricsValidation, async (req, res) => {
       `INSERT INTO financial_metrics 
        (company_id, period_end_date, revenue, gross_profit, ebitda, ebit, net_income, 
         total_debt, net_debt, cash_and_equivalents, enterprise_value, market_cap, shares_outstanding)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id`,
       [company_id, period_end_date, revenue, gross_profit, ebitda, ebit, net_income,
        total_debt, net_debt, cash_and_equivalents, enterprise_value, market_cap, shares_outstanding]
     );
+
+    const metricsId = metricsResult.rows[0].id;
 
     // Calculate ratios
     const financialData = {
@@ -100,9 +102,9 @@ router.post('/', financialMetricsValidation, async (req, res) => {
        (financial_metrics_id, company_id, total_debt_to_ebitda, net_debt_to_ebitda, 
         debt_to_equity, ebitda_margin, ebit_margin, net_margin, ev_to_ebitda, 
         ev_to_revenue, price_to_earnings, ebitda_to_interest)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
       [
-        metricsResult.id, 
+        metricsId, 
         company_id,
         calculatedRatios.total_debt_to_ebitda,
         calculatedRatios.net_debt_to_ebitda,
@@ -122,8 +124,8 @@ router.post('/', financialMetricsValidation, async (req, res) => {
       `SELECT fm.*, cr.*
        FROM financial_metrics fm
        LEFT JOIN calculated_ratios cr ON fm.id = cr.financial_metrics_id
-       WHERE fm.id = ?`,
-      [metricsResult.id]
+       WHERE fm.id = $1`,
+      [metricsId]
     );
 
     res.status(201).json({
@@ -165,11 +167,11 @@ router.put('/:id', financialMetricsValidation, async (req, res) => {
     // Update financial metrics
     const result = await db.run(
       `UPDATE financial_metrics 
-       SET company_id = ?, period_end_date = ?, revenue = ?, gross_profit = ?, 
-           ebitda = ?, ebit = ?, net_income = ?, total_debt = ?, net_debt = ?,
-           cash_and_equivalents = ?, enterprise_value = ?, market_cap = ?,
-           shares_outstanding = ?, updated_at = CURRENT_TIMESTAMP
-       WHERE id = ?`,
+       SET company_id = $1, period_end_date = $2, revenue = $3, gross_profit = $4, 
+           ebitda = $5, ebit = $6, net_income = $7, total_debt = $8, net_debt = $9,
+           cash_and_equivalents = $10, enterprise_value = $11, market_cap = $12,
+           shares_outstanding = $13, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $14`,
       [company_id, period_end_date, revenue, gross_profit, ebitda, ebit, net_income,
        total_debt, net_debt, cash_and_equivalents, enterprise_value, market_cap, 
        shares_outstanding, metricsId]
@@ -196,11 +198,11 @@ router.put('/:id', financialMetricsValidation, async (req, res) => {
     // Update calculated ratios
     await db.run(
       `UPDATE calculated_ratios 
-       SET total_debt_to_ebitda = ?, net_debt_to_ebitda = ?, debt_to_equity = ?,
-           ebitda_margin = ?, ebit_margin = ?, net_margin = ?, ev_to_ebitda = ?,
-           ev_to_revenue = ?, price_to_earnings = ?, ebitda_to_interest = ?,
+       SET total_debt_to_ebitda = $1, net_debt_to_ebitda = $2, debt_to_equity = $3,
+           ebitda_margin = $4, ebit_margin = $5, net_margin = $6, ev_to_ebitda = $7,
+           ev_to_revenue = $8, price_to_earnings = $9, ebitda_to_interest = $10,
            updated_at = CURRENT_TIMESTAMP
-       WHERE financial_metrics_id = ?`,
+       WHERE financial_metrics_id = $11`,
       [
         calculatedRatios.total_debt_to_ebitda,
         calculatedRatios.net_debt_to_ebitda,
@@ -221,7 +223,7 @@ router.put('/:id', financialMetricsValidation, async (req, res) => {
       `SELECT fm.*, cr.*
        FROM financial_metrics fm
        LEFT JOIN calculated_ratios cr ON fm.id = cr.financial_metrics_id
-       WHERE fm.id = ?`,
+       WHERE fm.id = $1`,
       [metricsId]
     );
 
@@ -241,7 +243,7 @@ router.delete('/:id', async (req, res) => {
   try {
     const metricsId = req.params.id;
     
-    const result = await db.run('DELETE FROM financial_metrics WHERE id = ?', [metricsId]);
+    const result = await db.run('DELETE FROM financial_metrics WHERE id = $1', [metricsId]);
     
     if (result.changes === 0) {
       return res.status(404).json({ error: 'Financial metrics not found' });
